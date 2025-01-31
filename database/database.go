@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"os"
 
@@ -22,10 +23,14 @@ func Migrate() (err error) {
 		connStr)
 
 	if err != nil {
+		log.Println(err.Error())
 		return err
 	}
 
 	err = m.Up()
+	if err != nil && err.Error() != "no change" {
+		log.Println(err.Error())
+	}
 
 	return err
 }
