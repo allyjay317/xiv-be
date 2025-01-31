@@ -18,7 +18,7 @@ func Migrate() (err error) {
 		return errors.New("connection string Not Found")
 	}
 	m, err := migrate.New(
-		"file://../database/migrations",
+		"file://database/migrations",
 		connStr)
 
 	if err != nil {
