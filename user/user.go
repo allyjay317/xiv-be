@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alyjay/xiv/character"
-	database "github.com/alyjay/xivdb"
+	"github.com/alyjay/xiv-be/character"
+	database "github.com/alyjay/xiv-be/database"
 	"github.com/google/uuid"
 
 	_ "github.com/lib/pq"
