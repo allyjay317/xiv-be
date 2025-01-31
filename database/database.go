@@ -36,6 +36,7 @@ func Migrate() (err error) {
 }
 
 func GetDb(w http.ResponseWriter) (db *sqlx.DB, err error) {
+	log.Println("Opening db")
 	connStr, exists := os.LookupEnv("DATABASE_CONN_STR")
 	if !exists {
 		return nil, errors.New("connection string Not Found")
@@ -43,7 +44,7 @@ func GetDb(w http.ResponseWriter) (db *sqlx.DB, err error) {
 	db, err = sqlx.Connect("postgres", connStr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("500 - Server Issue"))
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 
