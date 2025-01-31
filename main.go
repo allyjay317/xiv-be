@@ -26,14 +26,8 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	log.Println("Running Migrations")
-	err := database.Migrate()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	log.Println("Migrations Completed")
+	database.Migrate()
 
-	log.Println("Setting Up Routes")
 	router := mux.NewRouter()
 	router.HandleFunc("/user", user.GetUser).Methods("GET")
 	// router.HandleFunc("/users", user.CreateUser).Methods("POST")
@@ -45,7 +39,6 @@ func main() {
 	router.HandleFunc("/gearset/{characterId}/{id}", gearset.DeleteGearSet).Methods("DELETE")
 	router.HandleFunc("/gearset/{characterId}", gearset.GetGearSets).Methods("GET")
 
-	log.Println("Setting up CORS")
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowCredentials: true,
