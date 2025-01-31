@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	database "github.com/alyjay/xivdb"
+	database "github.com/alyjay/xiv-be/database"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )

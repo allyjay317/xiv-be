@@ -9,7 +9,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "server/server.go"
+            "program": "main.go"
         }
     ]
 }

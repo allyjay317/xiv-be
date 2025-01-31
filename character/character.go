@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	database "github.com/alyjay/xivdb"
+	database "github.com/alyjay/xiv-be/database"
 	"github.com/karashiiro/bingode"
 	"github.com/xivapi/godestone/v2"
 )
