@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -92,10 +93,12 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginUser(w http.ResponseWriter, r *http.Request) {
+	log.Println("Grabbing Env")
 	client_id, _ := os.LookupEnv("DISCORD_CLIENT_ID")
 	client_secret, _ := os.LookupEnv("DISCORD_CLIENT_SECRET")
 	redirect_uri, _ := os.LookupEnv("DISCORD_REDIRECT_URI")
 	site_url, _ := os.LookupEnv("SITE_URL")
+	log.Println("Grabbing Code")
 	code := r.URL.Query().Get("code")
 	pUrl := "https://discord.com/api/oauth2/token"
 	b := AuthTokenRequest{
@@ -117,8 +120,10 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(payloadBuf).Encode(b)
 
+	log.Println("Requesting Auth Token")
 	resp, err := http.Post(pUrl, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 	if err != nil {
+		log.Println(err.Error())
 		http.Redirect(w, r, site_url+"/error", http.StatusInternalServerError)
 		return
 	}
@@ -126,6 +131,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Println(err.Error())
 		http.Redirect(w, r, site_url+"/error", http.StatusInternalServerError)
 		return
 	}
@@ -137,11 +143,13 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Println("Requesting User Info")
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", "https://discord.com/api/users/@me", nil)
 	req.Header.Set("Authorization", result.TokenType+" "+result.AccessToken)
 	res, err := client.Do(req)
 	if err != nil {
+		log.Println(err.Error())
 		http.Redirect(w, r, site_url+"/error", http.StatusInternalServerError)
 		return
 	}
@@ -153,6 +161,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	newUUID := uuid.NewString()
 
+	log.Println("Creating user in database")
 	db, err := database.GetDb(w)
 	if err != nil {
 		return
