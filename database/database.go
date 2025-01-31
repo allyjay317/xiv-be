@@ -13,6 +13,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
+var DB *sqlx.DB
+
 func Migrate() (err error) {
 	connStr, exists := os.LookupEnv("DATABASE_URL")
 	if !exists {
@@ -36,6 +38,10 @@ func Migrate() (err error) {
 }
 
 func GetDb(w http.ResponseWriter) (db *sqlx.DB, err error) {
+	if DB != nil {
+		db = DB
+		return db, nil
+	}
 	log.Println("Opening db")
 	connStr, exists := os.LookupEnv("DATABASE_URL")
 	if !exists {
@@ -47,6 +53,8 @@ func GetDb(w http.ResponseWriter) (db *sqlx.DB, err error) {
 		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
+
+	DB = db
 
 	return db, err
 }
