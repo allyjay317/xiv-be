@@ -39,8 +39,12 @@ func Migrate() (err error) {
 
 func GetDb(w http.ResponseWriter) (db *sqlx.DB, err error) {
 	if DB != nil {
-		db = DB
-		return db, nil
+		err = DB.Ping()
+		if err == nil {
+			db = DB
+			return db, nil
+		}
+
 	}
 	log.Println("Opening db")
 	connStr, exists := os.LookupEnv("DATABASE_URL")
