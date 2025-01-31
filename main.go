@@ -40,7 +40,7 @@ func main() {
 	router.HandleFunc("/gearset/{characterId}", gearset.GetGearSets).Methods("GET")
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "web.postman.co"},
+		AllowedOrigins:   []string{"*"},
 		AllowCredentials: true,
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 	})
