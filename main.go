@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/alyjay/xiv-be/character"
 	"github.com/alyjay/xiv-be/database"
@@ -20,6 +21,10 @@ func init() {
 }
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	database.Migrate()
 
 	router := mux.NewRouter()
@@ -39,5 +44,5 @@ func main() {
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", c.Handler(router)))
+	log.Fatal(http.ListenAndServe(":"+port, c.Handler(router)))
 }
