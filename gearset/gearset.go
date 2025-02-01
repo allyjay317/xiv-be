@@ -99,6 +99,7 @@ type GearSetRequest struct {
 	UserId string `json:"id" db:"user_id"`
 	Name   string `json:"name" db:"name"`
 	Job    Job    `json:"job" db:"job"`
+	Tier   string `json:"tier" db:"tier"`
 	Items  map[int]struct {
 		Augmented bool   `json:"augmented"`
 		Have      bool   `json:"have"`
@@ -125,7 +126,7 @@ func AddGearSet(w http.ResponseWriter, r *http.Request) {
 
 	items, err := json.Marshal(req.Items)
 
-	_, err = db.Exec(`INSERT INTO gear_sets (id, user_id, character_id, name, job, config) VALUES ($1, $2, $3, $4, $5, $6)`, newUUID, req.UserId, characterId, req.Name, req.Job, items)
+	_, err = db.Exec(`INSERT INTO gear_sets (id, user_id, character_id, name, job, config, tier) VALUES ($1, $2, $3, $4, $5, $6)`, newUUID, req.UserId, characterId, req.Name, req.Job, items, req.Tier)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Error entering into database"))
