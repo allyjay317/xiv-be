@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	database "github.com/alyjay/xiv-be/database"
+	"github.com/gorilla/mux"
 	"github.com/karashiiro/bingode"
 	"github.com/xivapi/godestone/v2"
 )
@@ -26,6 +27,12 @@ type Character struct {
 	Name        string `json:"name" db:"name"`
 	Avatar      string `json:"avatar" db:"avatar"`
 	Portrait    string `json:"portrait" db:"portrait"`
+}
+
+func SetUpCharacterRoutes(r *mux.Router) {
+	r.HandleFunc("", SearchCharacter).Methods("POST")
+	r.HandleFunc("/verify", VerifyCharacter).Methods("POST")
+	r.HandleFunc("/c/{id}", DeleteCharacter).Methods("DELETE")
 }
 
 func FetchCharacterData(id uint32) (c *godestone.Character, err error) {
@@ -99,4 +106,19 @@ func VerifyCharacter(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 	w.Write([]byte("Verified"))
+}
+
+func DeleteCharacter(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	db, err := database.GetDb(w)
+	if err != nil {
+		return
+	}
+
+	_, err = db.Exec(`DELETE FROM characters WHERE id = $1`, id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
 }

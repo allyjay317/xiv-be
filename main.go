@@ -30,14 +30,11 @@ func main() {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/user", user.GetUser).Methods("GET")
-	// router.HandleFunc("/users", user.CreateUser).Methods("POST")
 	router.HandleFunc("/login", user.LoginUser).Methods("GET")
-	router.HandleFunc("/character", character.SearchCharacter).Methods("POST")
-	router.HandleFunc("/character/verify", character.VerifyCharacter).Methods("POST")
-	router.HandleFunc("/gearset/{characterId}", gearset.AddGearSet).Methods("POST")
-	router.HandleFunc("/gearset/{characterId}/{id}", gearset.UpdateGearSet).Methods("PATCH")
-	router.HandleFunc("/gearset/{characterId}/{id}", gearset.DeleteGearSet).Methods("DELETE")
-	router.HandleFunc("/gearset/{characterId}", gearset.GetGearSets).Methods("GET")
+	rCharacter := router.PathPrefix("/character").Subrouter()
+	character.SetUpCharacterRoutes(rCharacter)
+	rGearset := router.PathPrefix("/gearset").Subrouter()
+	gearset.SetUpGearSetRoutes(rGearset)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},

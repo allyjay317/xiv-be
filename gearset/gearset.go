@@ -111,6 +111,13 @@ type AddGearSetResponse struct {
 	ID string `json:"id"`
 }
 
+func SetUpGearSetRoutes(r *mux.Router) {
+	r.HandleFunc("/{characterId}", AddGearSet).Methods("POST")
+	r.HandleFunc("/{characterId}/{id}", UpdateGearSet).Methods("PATCH")
+	r.HandleFunc("/{characterId}/{id}", DeleteGearSet).Methods("DELETE")
+	r.HandleFunc("/{characterId}", GetGearSets).Methods("GET")
+}
+
 func AddGearSet(w http.ResponseWriter, r *http.Request) {
 	var req GearSetRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
@@ -126,7 +133,7 @@ func AddGearSet(w http.ResponseWriter, r *http.Request) {
 
 	items, err := json.Marshal(req.Items)
 
-	_, err = db.Exec(`INSERT INTO gear_sets (id, user_id, character_id, name, job, config, tier) VALUES ($1, $2, $3, $4, $5, $6)`, newUUID, req.UserId, characterId, req.Name, req.Job, items, req.Tier)
+	_, err = db.Exec(`INSERT INTO gear_sets (id, user_id, character_id, name, job, config, tier) VALUES ($1, $2, $3, $4, $5)`, newUUID, req.UserId, characterId, req.Name, req.Job, items)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Error entering into database"))
@@ -148,7 +155,7 @@ func GetGearSets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = db.Select(&Sets, `SELECT id, name, job, config from gear_sets WHERE character_id = $1`, characterId)
+	err = db.Select(&Sets, `SELECT id, name, job, config from gear_sets WHERE character_id = $1 AND archived = false`, characterId)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(Sets)
