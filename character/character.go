@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	database "github.com/alyjay/xiv-be/database"
+	"github.com/gorilla/mux"
 	"github.com/karashiiro/bingode"
 	"github.com/xivapi/godestone/v2"
 )
@@ -26,6 +27,13 @@ type Character struct {
 	Name        string `json:"name" db:"name"`
 	Avatar      string `json:"avatar" db:"avatar"`
 	Portrait    string `json:"portrait" db:"portrait"`
+}
+
+func SetUpCharacterRoutes(r *mux.Router) {
+	r.HandleFunc("", SearchCharacter).Methods("POST")
+	r.HandleFunc("/verify", VerifyCharacter).Methods("POST")
+	r.HandleFunc("/c/{id}", DeleteCharacter).Methods("DELETE")
+	r.HandleFunc("/c/{id}", UpdateCharacter).Methods("GET")
 }
 
 func FetchCharacterData(id uint32) (c *godestone.Character, err error) {
@@ -99,4 +107,65 @@ func VerifyCharacter(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 	w.Write([]byte("Verified"))
+}
+
+func DeleteCharacter(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	db, err := database.GetDb(w)
+	if err != nil {
+		return
+	}
+
+	_, err = db.Exec(`DELETE FROM characters WHERE character_id = $1`, id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func UpdateCharacter(w http.ResponseWriter, r *http.Request) {
+	characterId := mux.Vars(r)["id"]
+
+	id, err := strconv.ParseUint(characterId, 10, 32)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("Error"))
+		return
+	}
+
+	c, err := FetchCharacterData(uint32(id))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error"))
+		return
+	}
+
+	db, err := database.GetDb(w)
+	if err != nil {
+		return
+	}
+
+	_, err = db.Exec(`UPDATE characters SET
+	name = $1, 
+	avatar = $2, 
+	portrait = $3
+	WHERE character_id = $4`,
+		c.Name,
+		c.Avatar,
+		c.Portrait,
+		id)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(Character{
+		Name:        c.Name,
+		Avatar:      c.Avatar,
+		Portrait:    c.Portrait,
+		CharacterId: fmt.Sprint(c.ID),
+	})
 }

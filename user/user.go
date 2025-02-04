@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alyjay/xiv-be/character"
 	database "github.com/alyjay/xiv-be/database"
@@ -24,6 +25,8 @@ type User struct {
 	Avatar      string                `json:"avatar" db:"avatar"`
 	AccentColor string                `json:"accent_color" db:"accent_color"`
 	Characters  []character.Character `json:"characters"`
+	AuthToken   string                `json:"auth_token" db:"auth_token,omitempty"`
+	Expires     int64                 `json:"expires" db:"expires,omitempty"`
 }
 
 type AuthTokenRequest struct {
@@ -89,6 +92,15 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	user.Characters = append(user.Characters, characters...)
 
 	json.NewEncoder(w).Encode(user)
+}
+
+func GetAccentColor(user *DiscordUserResponse) (color string) {
+	if user.AccentColor != 0 {
+		color = fmt.Sprintf("#%x", user.AccentColor)
+	} else if user.BannerColor != "" {
+		color = user.BannerColor
+	}
+	return color
 }
 
 func LoginUser(w http.ResponseWriter, r *http.Request) {
@@ -165,19 +177,29 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		user.Username = userResult.Username
 		user.DiscordId = userResult.Id
 		user.Avatar = userResult.Avatar
-		if userResult.AccentColor != 0 {
-			user.AccentColor = fmt.Sprintf("#%x", userResult.AccentColor)
-		} else if userResult.BannerColor != "" {
-			user.AccentColor = userResult.BannerColor
-		}
-		_, err = db.Exec(`INSERT INTO users (id, username, discord_id, avatar, accent_color) VALUES ($1, $2, $3, $4, $5)`,
+		user.AccentColor = GetAccentColor(&userResult)
+		_, err = db.Exec(`INSERT INTO users (id, username, discord_id, avatar, accent_color, auth_token, expires) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 			user.ID,
 			user.Username,
 			user.DiscordId,
 			user.Avatar,
 			user.AccentColor,
-		)
+			result.AccessToken,
+			time.Now().UnixMilli()+int64(result.ExpiresIn), 0)
+	} else {
+		user.AccentColor = GetAccentColor(&userResult)
+		user.Avatar = userResult.Avatar
+		_, err = db.Exec(`UPDATE users SET 
+		accent_color = $1, 
+		avatar = $2, 
+		auth_token = $3, 
+		expires = $4 
+		WHERE discord_id=$5 `,
+			GetAccentColor(&userResult),
+			userResult.Avatar,
+			result.AccessToken,
+			time.Now().UnixMilli()+int64(result.ExpiresIn),
+			userResult.Id)
 	}
-
-	http.Redirect(w, r, site_url+"/login?id="+user.ID, http.StatusSeeOther)
+	http.Redirect(w, r, site_url+"/login?id="+user.ID+"&token="+result.AccessToken+"&expires="+fmt.Sprint(result.ExpiresIn), http.StatusSeeOther)
 }
