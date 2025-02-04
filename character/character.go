@@ -33,6 +33,7 @@ func SetUpCharacterRoutes(r *mux.Router) {
 	r.HandleFunc("", SearchCharacter).Methods("POST")
 	r.HandleFunc("/verify", VerifyCharacter).Methods("POST")
 	r.HandleFunc("/c/{id}", DeleteCharacter).Methods("DELETE")
+	r.HandleFunc("/c/{id}", UpdateCharacter).Methods("GET")
 }
 
 func FetchCharacterData(id uint32) (c *godestone.Character, err error) {
@@ -115,10 +116,56 @@ func DeleteCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Exec(`DELETE FROM characters WHERE id = $1`, id)
+	_, err = db.Exec(`DELETE FROM characters WHERE character_id = $1`, id)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func UpdateCharacter(w http.ResponseWriter, r *http.Request) {
+	characterId := mux.Vars(r)["id"]
+
+	id, err := strconv.ParseUint(characterId, 10, 32)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("Error"))
+		return
+	}
+
+	c, err := FetchCharacterData(uint32(id))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error"))
+		return
+	}
+
+	db, err := database.GetDb(w)
+	if err != nil {
+		return
+	}
+
+	_, err = db.Exec(`UPDATE characters SET
+	name = $1, 
+	avatar = $2, 
+	portrait = $3
+	WHERE character_id = $4`,
+		c.Name,
+		c.Avatar,
+		c.Portrait,
+		id)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(Character{
+		Name:        c.Name,
+		Avatar:      c.Avatar,
+		Portrait:    c.Portrait,
+		CharacterId: fmt.Sprint(c.ID),
+	})
 }
