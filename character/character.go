@@ -8,27 +8,11 @@ import (
 
 	database "github.com/alyjay/xiv-be/database"
 	"github.com/alyjay/xiv-be/response"
+	types "github.com/alyjay/xiv-be/types"
 	"github.com/gorilla/mux"
 	"github.com/karashiiro/bingode"
 	"github.com/xivapi/godestone/v2"
 )
-
-type AddCharacterRequest struct {
-	LodestoneId string `json:"lodestone_id"`
-}
-
-type VerifyCharacterRequest struct {
-	ID          string `json:"id"`
-	LodestoneId string `json:"lodestone_id"`
-	VerifyCode  string `json:"verify_code"`
-}
-
-type Character struct {
-	CharacterId string `json:"id" db:"character_id"`
-	Name        string `json:"name" db:"name"`
-	Avatar      string `json:"avatar" db:"avatar"`
-	Portrait    string `json:"portrait" db:"portrait"`
-}
 
 func SetUpCharacterRoutes(r *mux.Router) {
 	r.HandleFunc("", SearchCharacter).Methods("POST")
@@ -48,7 +32,7 @@ func FetchCharacterData(strId string) (c *godestone.Character, err error) {
 }
 
 func SearchCharacter(w http.ResponseWriter, r *http.Request) {
-	var req AddCharacterRequest
+	var req types.AddCharacterRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	c, err := FetchCharacterData(req.LodestoneId)
@@ -57,7 +41,7 @@ func SearchCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var chara Character
+	var chara types.Character
 	chara.Avatar = c.Avatar
 	chara.CharacterId = fmt.Sprintf("%d", c.ID)
 	chara.Name = c.Name
@@ -67,7 +51,7 @@ func SearchCharacter(w http.ResponseWriter, r *http.Request) {
 }
 
 func VerifyCharacter(w http.ResponseWriter, r *http.Request) {
-	var req VerifyCharacterRequest
+	var req types.VerifyCharacterRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	c, err := FetchCharacterData(req.LodestoneId)
@@ -135,7 +119,7 @@ func UpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(Character{
+	json.NewEncoder(w).Encode(types.Character{
 		Name:        c.Name,
 		Avatar:      c.Avatar,
 		Portrait:    c.Portrait,
