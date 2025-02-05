@@ -3,7 +3,6 @@ package database
 import (
 	"errors"
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -37,7 +36,7 @@ func Migrate() (err error) {
 	return err
 }
 
-func GetDb(w http.ResponseWriter) (db *sqlx.DB, err error) {
+func GetDb() (db *sqlx.DB, err error) {
 	if DB != nil {
 		err = DB.Ping()
 		if err == nil {
@@ -52,11 +51,6 @@ func GetDb(w http.ResponseWriter) (db *sqlx.DB, err error) {
 		return nil, errors.New("connection string Not Found")
 	}
 	db, err = sqlx.Connect("postgres", connStr)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("500 - Server Issue" + err.Error()))
-		return
-	}
 
 	DB = db
 

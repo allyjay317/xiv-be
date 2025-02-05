@@ -124,8 +124,10 @@ func AddGearSet(w http.ResponseWriter, r *http.Request) {
 
 	characterId := mux.Vars(r)["characterId"]
 
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 
@@ -150,8 +152,10 @@ func GetGearSets(w http.ResponseWriter, r *http.Request) {
 	characterId := mux.Vars(r)["characterId"]
 	var Sets []GearSet
 
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 
@@ -166,8 +170,10 @@ func UpdateGearSet(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	id := mux.Vars(r)["id"]
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 
@@ -194,8 +200,10 @@ func UpdateGearSet(w http.ResponseWriter, r *http.Request) {
 func DeleteGearSet(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 

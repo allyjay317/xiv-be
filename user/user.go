@@ -73,8 +73,10 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	var characters []character.Character
 	id := r.URL.Query().Get("id")
 
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 	err = db.Get(&user, `SELECT * FROM users WHERE id=$1`, id)
@@ -165,8 +167,10 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	newUUID := uuid.NewString()
 
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 
