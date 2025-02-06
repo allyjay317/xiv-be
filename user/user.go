@@ -1,100 +1,39 @@
 package user
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/alyjay/xiv-be/character"
 	database "github.com/alyjay/xiv-be/database"
+	"github.com/alyjay/xiv-be/externalapi"
+	"github.com/alyjay/xiv-be/response"
+	types "github.com/alyjay/xiv-be/types"
 	"github.com/google/uuid"
 
 	_ "github.com/lib/pq"
 )
 
-type User struct {
-	ID          string                `json:"id,omitempty" db:"id"`
-	Username    string                `json:"username" db:"username"`
-	DiscordId   string                `json:"discord_id" db:"discord_id"`
-	Avatar      string                `json:"avatar" db:"avatar"`
-	AccentColor string                `json:"accent_color" db:"accent_color"`
-	Characters  []character.Character `json:"characters"`
-	AuthToken   string                `json:"auth_token" db:"auth_token,omitempty"`
-	Expires     int64                 `json:"expires" db:"expires,omitempty"`
-}
-
-type AuthTokenRequest struct {
-	ClientId     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	Code         string `json:"code"`
-	GrantType    string `json:"grant_type"`
-	RedirectURI  string `json:"redirect_uri"`
-	Scope        string `json:"scope"`
-}
-
-type AuthTokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
-	RefreshToken string `json:"refresh_token"`
-	Scope        string `json:"scope"`
-}
-
-type DiscordUserResponse struct {
-	Id                   string `json:"id"`
-	Username             string `json:"username"`
-	Avatar               string `json:"avatar"`
-	Discriminator        string `json:"discriminator"`
-	PublicFlags          int    `json:"public_flags"`
-	Flags                int    `json:"flags"`
-	Banner               string `json:"banner"`
-	AccentColor          int    `json:"accent_color"`
-	GlobalName           string `json:"global_name"`
-	AvatarDecorationData map[string]struct {
-		SkuId string `json:"sku_id"`
-		Asset string `json:"asset"`
-	} `json:"avatar_decoration_data"`
-	BannerColor  string              `json:"banner_color"`
-	Clan         map[string]struct{} `json:"clan"`
-	PrimaryGuild map[string]struct{} `json:"primary_guild"`
-	MfaEnabled   bool                `json:"mfa_enabled"`
-	Locale       string              `json:"locale"`
-	PremiumType  int                 `json:"premium_type"`
-}
-
 func GetUser(w http.ResponseWriter, r *http.Request) {
-	var user User
-	var characters []character.Character
 	id := r.URL.Query().Get("id")
 
-	db, err := database.GetDb(w)
+	user, err := database.GetUser(id)
 	if err != nil {
-		return
-	}
-	err = db.Get(&user, `SELECT * FROM users WHERE id=$1`, id)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("No User Found"))
+		response.NotFoundError(w, "No User Found")
 		return
 	}
 
-	err = db.Select(&characters, `SELECT character_id, name, avatar, portrait FROM characters WHERE user_id=$1`, id)
-	if err != nil {
-
+	characters, err := database.GetCharacters(id)
+	if err == nil {
+		user.Characters = append(user.Characters, characters...)
 	}
-
-	user.Characters = append(user.Characters, characters...)
 
 	json.NewEncoder(w).Encode(user)
 }
 
-func GetAccentColor(user *DiscordUserResponse) (color string) {
+func GetAccentColor(user *types.DiscordUserResponse) (color string) {
 	if user.AccentColor != 0 {
 		color = fmt.Sprintf("#%x", user.AccentColor)
 	} else if user.BannerColor != "" {
@@ -104,102 +43,36 @@ func GetAccentColor(user *DiscordUserResponse) (color string) {
 }
 
 func LoginUser(w http.ResponseWriter, r *http.Request) {
-	client_id, _ := os.LookupEnv("DISCORD_CLIENT_ID")
-	client_secret, _ := os.LookupEnv("DISCORD_CLIENT_SECRET")
-	redirect_uri, _ := os.LookupEnv("DISCORD_REDIRECT_URI")
 	site_url, _ := os.LookupEnv("SITE_URL")
 	code := r.URL.Query().Get("code")
-	pUrl := "https://discord.com/api/oauth2/token"
-	b := AuthTokenRequest{
-		ClientId:     client_id,
-		ClientSecret: client_secret,
-		Code:         code,
-		GrantType:    "client_credentials",
-		RedirectURI:  redirect_uri,
-		Scope:        "identify",
-	}
-	payloadBuf := new(bytes.Buffer)
-
-	data := url.Values{}
-	data.Set("client_id", client_id)
-	data.Set("client_secret", client_secret)
-	data.Set("code", code)
-	data.Set("grant_type", "authorization_code")
-	data.Set("redirect_uri", redirect_uri)
-
-	json.NewEncoder(payloadBuf).Encode(b)
-
-	resp, err := http.Post(pUrl, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
-	if err != nil {
-		http.Redirect(w, r, site_url+"/error", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
+	var auth types.AuthTokenResponse
+	var userResult types.DiscordUserResponse
+	err := externalapi.RequestAuthToken(&auth, code)
 	if err != nil {
 		http.Redirect(w, r, site_url+"/error", http.StatusInternalServerError)
 		return
 	}
 
-	var result AuthTokenResponse
-	err = json.Unmarshal([]byte(body), &result)
+	err = externalapi.GetUserInfo(&userResult, auth)
+
 	if err != nil {
 		http.Redirect(w, r, site_url+"/error", http.StatusInternalServerError)
 		return
 	}
 
-	client := &http.Client{}
-	req, _ := http.NewRequest("GET", "https://discord.com/api/users/@me", nil)
-	req.Header.Set("Authorization", result.TokenType+" "+result.AccessToken)
-	res, err := client.Do(req)
+	user := types.User{
+		ID:          uuid.NewString(),
+		Username:    userResult.Username,
+		DiscordId:   userResult.Id,
+		Avatar:      userResult.Avatar,
+		AccentColor: GetAccentColor(&userResult),
+		AuthToken:   auth.AccessToken,
+		Expires:     time.Now().UnixMilli() + int64(auth.ExpiresIn),
+	}
+	id, err := database.InsertUser(user)
 	if err != nil {
 		http.Redirect(w, r, site_url+"/error", http.StatusInternalServerError)
 		return
 	}
-
-	defer res.Body.Close()
-
-	var userResult DiscordUserResponse
-	_ = json.NewDecoder(res.Body).Decode(&userResult)
-
-	newUUID := uuid.NewString()
-
-	db, err := database.GetDb(w)
-	if err != nil {
-		return
-	}
-
-	var user User
-	user.ID = newUUID
-	err = db.Get(&user, `SELECT * FROM users WHERE discord_id=$1`, userResult.Id)
-	if err != nil {
-		user.Username = userResult.Username
-		user.DiscordId = userResult.Id
-		user.Avatar = userResult.Avatar
-		user.AccentColor = GetAccentColor(&userResult)
-		_, err = db.Exec(`INSERT INTO users (id, username, discord_id, avatar, accent_color, auth_token, expires) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-			user.ID,
-			user.Username,
-			user.DiscordId,
-			user.Avatar,
-			user.AccentColor,
-			result.AccessToken,
-			time.Now().UnixMilli()+int64(result.ExpiresIn), 0)
-	} else {
-		user.AccentColor = GetAccentColor(&userResult)
-		user.Avatar = userResult.Avatar
-		_, err = db.Exec(`UPDATE users SET 
-		accent_color = $1, 
-		avatar = $2, 
-		auth_token = $3, 
-		expires = $4 
-		WHERE discord_id=$5 `,
-			GetAccentColor(&userResult),
-			userResult.Avatar,
-			result.AccessToken,
-			time.Now().UnixMilli()+int64(result.ExpiresIn),
-			userResult.Id)
-	}
-	http.Redirect(w, r, site_url+"/login?id="+user.ID+"&token="+result.AccessToken+"&expires="+fmt.Sprint(result.ExpiresIn), http.StatusSeeOther)
+	http.Redirect(w, r, site_url+"/login?id="+id+"&token="+auth.AccessToken+"&expires="+fmt.Sprint(auth.ExpiresIn), http.StatusSeeOther)
 }

@@ -7,27 +7,12 @@ import (
 	"strconv"
 
 	database "github.com/alyjay/xiv-be/database"
+	"github.com/alyjay/xiv-be/response"
+	types "github.com/alyjay/xiv-be/types"
 	"github.com/gorilla/mux"
 	"github.com/karashiiro/bingode"
 	"github.com/xivapi/godestone/v2"
 )
-
-type AddCharacterRequest struct {
-	LodestoneId string `json:"lodestone_id"`
-}
-
-type VerifyCharacterRequest struct {
-	ID          string `json:"id"`
-	LodestoneId string `json:"lodestone_id"`
-	VerifyCode  string `json:"verify_code"`
-}
-
-type Character struct {
-	CharacterId string `json:"id" db:"character_id"`
-	Name        string `json:"name" db:"name"`
-	Avatar      string `json:"avatar" db:"avatar"`
-	Portrait    string `json:"portrait" db:"portrait"`
-}
 
 func SetUpCharacterRoutes(r *mux.Router) {
 	r.HandleFunc("", SearchCharacter).Methods("POST")
@@ -36,31 +21,27 @@ func SetUpCharacterRoutes(r *mux.Router) {
 	r.HandleFunc("/c/{id}", UpdateCharacter).Methods("GET")
 }
 
-func FetchCharacterData(id uint32) (c *godestone.Character, err error) {
+func FetchCharacterData(strId string) (c *godestone.Character, err error) {
+	id, err := strconv.ParseUint(strId, 10, 32)
+	if err != nil {
+		return nil, err
+	}
 	s := godestone.NewScraper(bingode.New(), godestone.EN)
-	c, err = s.FetchCharacter(id)
+	c, err = s.FetchCharacter(uint32(id))
 	return c, err
 }
 
 func SearchCharacter(w http.ResponseWriter, r *http.Request) {
-	var req AddCharacterRequest
+	var req types.AddCharacterRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	id, err := strconv.ParseUint(req.LodestoneId, 10, 32)
+	c, err := FetchCharacterData(req.LodestoneId)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Error"))
+		response.NotFoundError(w, "Failed to get character data")
 		return
 	}
 
-	c, err := FetchCharacterData(uint32(id))
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Error"))
-		return
-	}
-
-	var chara Character
+	var chara types.Character
 	chara.Avatar = c.Avatar
 	chara.CharacterId = fmt.Sprintf("%d", c.ID)
 	chara.Name = c.Name
@@ -70,38 +51,30 @@ func SearchCharacter(w http.ResponseWriter, r *http.Request) {
 }
 
 func VerifyCharacter(w http.ResponseWriter, r *http.Request) {
-	var req VerifyCharacterRequest
+	var req types.VerifyCharacterRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	id, err := strconv.ParseUint(req.LodestoneId, 10, 32)
+	c, err := FetchCharacterData(req.LodestoneId)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Error"))
-		return
-	}
-
-	c, err := FetchCharacterData(uint32(id))
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Error"))
+		response.NotFoundError(w, "Failed to get character data")
 		return
 	}
 
 	if c.Bio != req.VerifyCode {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Verify String Incorrect"))
+		response.NotFoundError(w, "Verify String Incorrect")
 		return
 	}
 
-	db, err := database.GetDb(w)
-	if err != nil {
-		return
-	}
+	err = database.InsertCharacter(database.CharacterRow{
+		LodestoneId: req.LodestoneId,
+		UserId:      req.ID,
+		Name:        c.Name,
+		Avatar:      c.Avatar,
+		Portrait:    c.Portrait,
+	})
 
-	_, err = db.Exec(`INSERT INTO characters (character_id, user_id, name, avatar, portrait) VALUES ($1, $2, $3, $4, $5)`, req.LodestoneId, req.ID, c.Name, c.Avatar, c.Portrait)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("500 - Server Issue"))
+		response.InternalServerError(w)
 		return
 	}
 
@@ -111,14 +84,15 @@ func VerifyCharacter(w http.ResponseWriter, r *http.Request) {
 
 func DeleteCharacter(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		response.InternalServerError(w, err.Error())
 		return
 	}
 
 	_, err = db.Exec(`DELETE FROM characters WHERE character_id = $1`, id)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		response.BadRequestError(w)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
@@ -127,42 +101,25 @@ func DeleteCharacter(w http.ResponseWriter, r *http.Request) {
 func UpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	characterId := mux.Vars(r)["id"]
 
-	id, err := strconv.ParseUint(characterId, 10, 32)
+	c, err := FetchCharacterData(characterId)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Error"))
+		response.NotFoundError(w, "Failed to retrieve character data")
 		return
 	}
 
-	c, err := FetchCharacterData(uint32(id))
+	err = database.UpdateCharacter(database.CharacterRow{
+		LodestoneId: characterId,
+		Name:        c.Name,
+		Avatar:      c.Avatar,
+		Portrait:    c.Portrait,
+	})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Error"))
-		return
-	}
-
-	db, err := database.GetDb(w)
-	if err != nil {
-		return
-	}
-
-	_, err = db.Exec(`UPDATE characters SET
-	name = $1, 
-	avatar = $2, 
-	portrait = $3
-	WHERE character_id = $4`,
-		c.Name,
-		c.Avatar,
-		c.Portrait,
-		id)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("500 - Server Issue"))
+		response.InternalServerError(w, "Failed to update character")
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(Character{
+	json.NewEncoder(w).Encode(types.Character{
 		Name:        c.Name,
 		Avatar:      c.Avatar,
 		Portrait:    c.Portrait,

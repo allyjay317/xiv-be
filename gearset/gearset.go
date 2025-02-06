@@ -1,115 +1,14 @@
 package gearset
 
 import (
-	"database/sql/driver"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	database "github.com/alyjay/xiv-be/database"
+	types "github.com/alyjay/xiv-be/types"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
-
-type Source int
-type Job int
-type Slot int
-
-const (
-	Raid Source = iota
-	Crafted
-	Tome
-	Chaotic
-	Ultimate
-)
-
-const (
-	WHM Job = iota
-	SCH
-	AST
-	SGE
-	PLD
-	WAR
-	DRK
-	GNB
-	MNK
-	DRG
-	NIN
-	SAM
-	RPR
-	BRD
-	MCH
-	DNC
-	RDM
-	BLM
-	SMN
-	BLU
-	VPR
-	PCT
-)
-
-const (
-	HEAD Slot = iota
-	BODY
-	HANDS
-	LEGS
-	FEET
-	EARRINGS
-	NECKLACE
-	BRACELET
-	RING1
-	RING2
-	WEAPON
-	OFFHAND
-)
-
-type GearPiece struct {
-	Source    Source `json:"source"`
-	Have      bool   `json:"have"`
-	Augmented bool   `json:"augmented,omitempty"`
-}
-
-type Items map[int]interface{}
-
-func (i *Items) Scan(val interface{}) error {
-	switch v := val.(type) {
-	case []byte:
-		json.Unmarshal(v, &i)
-		return nil
-	case string:
-		json.Unmarshal([]byte(v), &i)
-		return nil
-	default:
-		return fmt.Errorf("unsupported type %T", v)
-	}
-}
-
-func (i *Items) Value() (driver.Value, error) {
-	return json.Marshal(i)
-}
-
-type GearSet struct {
-	ID    string `json:"id" db:"id"`
-	Name  string `json:"name" db:"name"`
-	Job   Job    `json:"job" db:"job"`
-	Items Items  `json:"items" db:"config"`
-}
-
-type GearSetRequest struct {
-	UserId string `json:"id" db:"user_id"`
-	Name   string `json:"name" db:"name"`
-	Job    Job    `json:"job" db:"job"`
-	Tier   string `json:"tier" db:"tier"`
-	Items  map[int]struct {
-		Augmented bool   `json:"augmented"`
-		Have      bool   `json:"have"`
-		Source    Source `json:"source"`
-	} `json:"items" db:"config"`
-}
-
-type AddGearSetResponse struct {
-	ID string `json:"id"`
-}
 
 func SetUpGearSetRoutes(r *mux.Router) {
 	r.HandleFunc("/{characterId}", AddGearSet).Methods("POST")
@@ -119,13 +18,15 @@ func SetUpGearSetRoutes(r *mux.Router) {
 }
 
 func AddGearSet(w http.ResponseWriter, r *http.Request) {
-	var req GearSetRequest
+	var req types.GearSetRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	characterId := mux.Vars(r)["characterId"]
 
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 
@@ -133,13 +34,33 @@ func AddGearSet(w http.ResponseWriter, r *http.Request) {
 
 	items, err := json.Marshal(req.Items)
 
-	_, err = db.Exec(`INSERT INTO gear_sets (id, user_id, character_id, name, job, config, tier) VALUES ($1, $2, $3, $4, $5)`, newUUID, req.UserId, characterId, req.Name, req.Job, items)
+	_, err = db.Exec(`
+		INSERT INTO gear_sets (
+			id, 
+			user_id, 
+			character_id, 
+			name, 
+			job, 
+			config
+		) VALUES (
+		 	$1, 
+			$2, 
+			$3, 
+			$4, 
+			$5,
+			$6)`,
+		newUUID,
+		req.UserId,
+		characterId,
+		req.Name,
+		req.Job,
+		items)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Error entering into database"))
 	}
 
-	var res AddGearSetResponse
+	var res types.AddGearSetResponse
 	res.ID = newUUID
 
 	w.WriteHeader(http.StatusCreated)
@@ -148,10 +69,12 @@ func AddGearSet(w http.ResponseWriter, r *http.Request) {
 
 func GetGearSets(w http.ResponseWriter, r *http.Request) {
 	characterId := mux.Vars(r)["characterId"]
-	var Sets []GearSet
+	var Sets []types.GearSet
 
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 
@@ -162,12 +85,14 @@ func GetGearSets(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateGearSet(w http.ResponseWriter, r *http.Request) {
-	var req GearSetRequest
+	var req types.GearSetRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	id := mux.Vars(r)["id"]
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 
@@ -194,8 +119,10 @@ func UpdateGearSet(w http.ResponseWriter, r *http.Request) {
 func DeleteGearSet(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	db, err := database.GetDb(w)
+	db, err := database.GetDb()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Server Issue" + err.Error()))
 		return
 	}
 
