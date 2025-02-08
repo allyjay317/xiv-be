@@ -87,6 +87,7 @@ type GearSet struct {
 	ID    string `json:"id" db:"id"`
 	Name  string `json:"name" db:"name"`
 	Job   Job    `json:"job" db:"job"`
+	Index int    `json:"index" db:"index"`
 	Items Items  `json:"items" db:"config"`
 }
 
