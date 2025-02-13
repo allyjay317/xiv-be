@@ -1,0 +1,2 @@
+ALTER TABLE IF EXISTS gear_sets
+    ADD COLUMN IF NOT EXISTS index int

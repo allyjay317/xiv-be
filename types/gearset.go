@@ -64,7 +64,8 @@ type GearPiece struct {
 	Augmented bool   `json:"augmented,omitempty"`
 }
 
-type Items map[int]interface{}
+type Items map[int]interface {
+}
 
 func (i *Items) Scan(val interface{}) error {
 	switch v := val.(type) {
@@ -84,22 +85,19 @@ func (i *Items) Value() (driver.Value, error) {
 }
 
 type GearSet struct {
-	ID    string `json:"id" db:"id"`
-	Name  string `json:"name" db:"name"`
-	Job   Job    `json:"job" db:"job"`
-	Items Items  `json:"items" db:"config"`
+	Archived    bool   `json:"archived" db:"archived"`
+	ID          string `json:"id" db:"id"`
+	Index       int    `json:"index" db:"index"`
+	Items       Items  `json:"items" db:"config"`
+	Job         Job    `json:"job" db:"job"`
+	Name        string `json:"name" db:"name"`
+	UserId      string `json:"user_id" db:"user_id"`
+	CharacterId string `json:"character_id" db:"character_id"`
 }
 
-type GearSetRequest struct {
-	UserId string `json:"id" db:"user_id"`
-	Name   string `json:"name" db:"name"`
-	Job    Job    `json:"job" db:"job"`
-	Tier   string `json:"tier" db:"tier"`
-	Items  map[int]struct {
-		Augmented bool   `json:"augmented"`
-		Have      bool   `json:"have"`
-		Source    Source `json:"source"`
-	} `json:"items" db:"config"`
+type GearSetRow struct {
+	GearSet
+	Items []byte `json:"id" db:"config"`
 }
 
 type AddGearSetResponse struct {
