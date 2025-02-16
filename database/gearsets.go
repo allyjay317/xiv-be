@@ -30,14 +30,16 @@ func InsertGearSet(g types.GearSet) (err error) {
 		character_id,
 		name,
 		job,
-		config
+		config,
+		index
 	) VALUES (
 		 :id,
 		 :user_id,
 		 :character_id,
 		 :name,
 		 :job,
-		 :config
+		 :config,
+		 :index
 	)
 	`, gs)
 
