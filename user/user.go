@@ -26,6 +26,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	characters, err := database.GetCharacters(id)
+
 	if err == nil {
 		user.Characters = append(user.Characters, characters...)
 	}
