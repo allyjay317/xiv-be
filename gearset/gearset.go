@@ -13,10 +13,10 @@ import (
 
 func SetUpGearSetRoutes(r *mux.Router) {
 	r.HandleFunc("/{characterId}", AddGearSet).Methods("POST")
-	r.HandleFunc("/{characterId}/{id}", UpdateGearSet).Methods("PATCH")
-	r.HandleFunc("/{characterId}/{id}", DeleteGearSet).Methods("DELETE")
 	r.HandleFunc("/{characterId}", GetGearSets).Methods("GET")
 	r.HandleFunc("/{characterId}", BulkUpdateGearSets).Methods("PATCH")
+	r.HandleFunc("/{characterId}/{id}", UpdateGearSet).Methods("PATCH")
+	r.HandleFunc("/{characterId}/{id}", DeleteGearSet).Methods("DELETE")
 }
 
 func AddGearSet(w http.ResponseWriter, r *http.Request) {
@@ -49,10 +49,12 @@ func AddGearSet(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetGearSets(w http.ResponseWriter, r *http.Request) {
+	archived := r.URL.Query().Has("archived")
+
 	characterId := mux.Vars(r)["characterId"]
 	var Sets []types.GearSet
 
-	Sets, err := database.SelectGearSetsForCharacter(characterId)
+	Sets, err := database.SelectGearSetsForCharacter(characterId, archived)
 	if err != nil {
 		response.InternalServerError(w, err.Error())
 		return
@@ -98,7 +100,6 @@ func BulkUpdateGearSets(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	for i, s := range req {
-		// items, _ := json.Marshal(s.Items)
 		database.UpdateGearSet(types.GearSet{
 			ID:          s.ID,
 			Name:        s.Name,
@@ -106,6 +107,7 @@ func BulkUpdateGearSets(w http.ResponseWriter, r *http.Request) {
 			Index:       i,
 			Items:       s.Items,
 			CharacterId: characterId,
+			Archived:    s.Archived,
 		})
 	}
 

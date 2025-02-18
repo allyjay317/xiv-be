@@ -46,7 +46,7 @@ func InsertGearSet(g types.GearSet) (err error) {
 	return err
 }
 
-func SelectGearSetsForCharacter(id string) (gs []types.GearSet, err error) {
+func SelectGearSetsForCharacter(id string, archived bool) (gs []types.GearSet, err error) {
 	db, err := GetDb()
 
 	if err != nil {
@@ -59,9 +59,9 @@ func SelectGearSetsForCharacter(id string) (gs []types.GearSet, err error) {
 	FROM gear_sets WHERE
 		character_id = $1
 	AND
-		archived = false
+		archived = $2
 	ORDER BY index ASC
-	`, id)
+	`, id, archived)
 
 	return gs, err
 }
@@ -74,12 +74,11 @@ func UpdateGearSet(g ...types.GearSet) (err error) {
 	}
 	var gs []types.GearSetRow
 
-	for i, s := range g {
+	for _, s := range g {
 		items, err := json.Marshal(s.Items)
 		if err != nil {
 			return err
 		}
-		s.Index = i
 		gs = append(gs, types.GearSetRow{
 			GearSet: s,
 			Items:   items,
@@ -91,7 +90,8 @@ func UpdateGearSet(g ...types.GearSet) (err error) {
 			name = :name,
 			job = :job,
 			config = :config,
-			index = :index
+			index = :index,
+			archived = :archived
 		WHERE id = :id AND character_id = :character_id
 	`, gs)
 
