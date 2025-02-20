@@ -6,56 +6,130 @@ import (
 	"github.com/alyjay/xiv-be/types"
 )
 
-func InsertGearSet(g types.GearSet) (err error) {
+func InsertGearPiece(pieces []types.GearPieceRow, gsId string) (err error) {
+
+	db, err := GetDb()
+	if err != nil {
+		return err
+	}
+
+	req, err := db.NamedQuery(`
+			INSERT INTO gear_pieces (
+				slot,
+				source,
+				have,
+				augmented,
+				priority
+			) VALUES (
+			 	:slot,
+				:source,
+				:have,
+				:augmented,
+				:priority
+			 ) RETURNING id
+		`, pieces)
+	if err != nil {
+		return err
+	}
+	for req.Next() {
+		var id int
+		req.Scan(&id)
+		_, err = db.Exec(`
+			INSERT INTO gear_sets_gear_pieces (
+				gear_set_id,
+				gear_piece_id
+			) VALUES (
+			 $1,
+			 $2
+			)
+		`, gsId, id)
+		if err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
+func InsertGearSetV2(g types.GearSetV2) (err error) {
+
 	db, err := GetDb()
 
 	if err != nil {
 		return err
 	}
 
-	items, err := json.Marshal(g.Items)
-	if err != nil {
-		return err
-	}
-
-	gs := types.GearSetRow{
-		GearSet: g,
-		Items:   items,
-	}
-
 	_, err = db.NamedExec(`
-	INSERT INTO gear_sets (
-		id,
-		user_id,
-		character_id,
-		name,
-		job,
-		config,
-		index
-	) VALUES (
+		INSERT INTO gear_sets (
+			id,
+			user_id,
+			character_id,
+			name,
+			job,
+			index
+		) VALUES (
 		 :id,
 		 :user_id,
 		 :character_id,
 		 :name,
 		 :job,
-		 :config,
 		 :index
-	)
-	`, gs)
+		 )
+	`, g)
+
+	if err != nil {
+		return err
+	}
+
+	pieces := ConvertPieceMapToRow(g.Items)
+	err = InsertGearPiece(pieces, g.ID)
 
 	return err
 }
 
-func SelectGearSetsForCharacter(id string, archived bool) (gs []types.GearSet, err error) {
+func GetConfig(id string) (gs types.ItemsV2, err error) {
+	db, err := GetDb()
+	if err != nil {
+		return nil, err
+	}
+
+	query := db.QueryRow(`
+		SELECT config from gear_sets WHERE id = $1
+	`, id)
+
+	var jsonData []byte
+	err = query.Scan(&jsonData)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(jsonData, &gs)
+
+	return gs, err
+}
+
+func ConvertPieceMapToRow(pieces types.ItemsV2) (rows []types.GearPieceRow) {
+	for key, value := range pieces {
+		rows = append(rows, types.GearPieceRow{
+			GearPiece: value,
+			Slot:      key,
+		})
+
+	}
+	return rows
+}
+
+func SelectGearSetsForCharacterV2(id string, archived bool) (gs []types.GearSetV2, err error) {
 	db, err := GetDb()
 
 	if err != nil {
-		return gs, err
+		return nil, err
 	}
 
 	err = db.Select(&gs, `
 	SELECT 
-		id, name, job, config
+		id, name, job
 	FROM gear_sets WHERE
 		character_id = $1
 	AND
@@ -63,37 +137,74 @@ func SelectGearSetsForCharacter(id string, archived bool) (gs []types.GearSet, e
 	ORDER BY index ASC
 	`, id, archived)
 
-	return gs, err
+	if err != nil {
+		return nil, err
+	}
+
+	var ret []types.GearSetV2
+
+	for _, k := range gs {
+		var Items []types.GearPieceRow
+		err = db.Select(&Items, `
+			SELECT 
+				p.id, 
+				p.source, 
+				p.have, 
+				p.augmented, 
+				p.priority, 
+				p.slot 
+			FROM gear_pieces p
+			JOIN gear_sets_gear_pieces r
+			ON r.gear_piece_id = p.id
+			WHERE r.gear_set_id = $1
+		`, k.ID)
+		k.Items = make(map[types.Slot]types.GearPiece)
+		if len(Items) < 11 {
+			k.Items, err = GetConfig(k.ID)
+			pieces := ConvertPieceMapToRow(k.Items)
+			InsertGearPiece(pieces, k.ID)
+		} else {
+			for _, l := range Items {
+				k.Items[l.Slot] = l.GearPiece
+			}
+		}
+
+		ret = append(ret, k)
+
+	}
+
+	return ret, err
 }
 
-func UpdateGearSet(g ...types.GearSet) (err error) {
+func UpdateGearSetV2(g types.GearSetV2) (err error) {
 	db, err := GetDb()
 
 	if err != nil {
 		return err
-	}
-	var gs []types.GearSetRow
-
-	for _, s := range g {
-		items, err := json.Marshal(s.Items)
-		if err != nil {
-			return err
-		}
-		gs = append(gs, types.GearSetRow{
-			GearSet: s,
-			Items:   items,
-		})
 	}
 
 	_, err = db.NamedExec(`
 		UPDATE gear_sets SET
 			name = :name,
 			job = :job,
-			config = :config,
 			index = :index,
 			archived = :archived
 		WHERE id = :id AND character_id = :character_id
-	`, gs)
+	`, g)
+
+	pieces := ConvertPieceMapToRow(g.Items)
+	for _, piece := range pieces {
+		_, err = db.NamedExec(`
+			UPDATE gear_pieces SET
+				have = :have,
+				augmented = :augmented,
+				priority = :priority
+			WHERE id = :id AND slot = :slot
+		`, piece)
+		if err != nil {
+			return err
+		}
+	}
 
 	return err
 }

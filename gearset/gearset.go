@@ -20,14 +20,14 @@ func SetUpGearSetRoutes(r *mux.Router) {
 }
 
 func AddGearSet(w http.ResponseWriter, r *http.Request) {
-	var req types.GearSet
+	var req types.GearSetV2
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	characterId := mux.Vars(r)["characterId"]
 
 	newUUID := uuid.NewString()
 
-	err := database.InsertGearSet(types.GearSet{
+	err := database.InsertGearSetV2(types.GearSetV2{
 		ID:          newUUID,
 		UserId:      req.UserId,
 		CharacterId: characterId,
@@ -52,9 +52,9 @@ func GetGearSets(w http.ResponseWriter, r *http.Request) {
 	archived := r.URL.Query().Has("archived")
 
 	characterId := mux.Vars(r)["characterId"]
-	var Sets []types.GearSet
+	var Sets []types.GearSetV2
 
-	Sets, err := database.SelectGearSetsForCharacter(characterId, archived)
+	Sets, err := database.SelectGearSetsForCharacterV2(characterId, archived)
 	if err != nil {
 		response.InternalServerError(w, err.Error())
 		return
@@ -66,7 +66,7 @@ func GetGearSets(w http.ResponseWriter, r *http.Request) {
 
 func UpdateGearSet(w http.ResponseWriter, r *http.Request) {
 
-	var req types.GearSet
+	var req types.GearSetV2
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	id := mux.Vars(r)["id"]
@@ -74,7 +74,7 @@ func UpdateGearSet(w http.ResponseWriter, r *http.Request) {
 	req.CharacterId = characterId
 	req.ID = id
 
-	err := database.UpdateGearSet(req)
+	err := database.UpdateGearSetV2(req)
 
 	if err != nil {
 		response.InternalServerError(w, err.Error())
@@ -96,11 +96,11 @@ func DeleteGearSet(w http.ResponseWriter, r *http.Request) {
 func BulkUpdateGearSets(w http.ResponseWriter, r *http.Request) {
 	characterId := mux.Vars(r)["characterId"]
 
-	var req []types.GearSet
+	var req []types.GearSetV2
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	for i, s := range req {
-		database.UpdateGearSet(types.GearSet{
+		database.UpdateGearSetV2(types.GearSetV2{
 			ID:          s.ID,
 			Name:        s.Name,
 			Job:         s.Job,
