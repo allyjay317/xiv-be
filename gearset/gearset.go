@@ -27,7 +27,7 @@ func AddGearSet(w http.ResponseWriter, r *http.Request) {
 
 	newUUID := uuid.NewString()
 
-	err := database.InsertGearSetV2(types.GearSetV2{
+	set, err := database.InsertGearSetV2(types.GearSetV2{
 		ID:          newUUID,
 		UserId:      req.UserId,
 		CharacterId: characterId,
@@ -41,11 +41,10 @@ func AddGearSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var res types.AddGearSetResponse
-	res.ID = newUUID
+	set.ID = newUUID
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(res)
+	json.NewEncoder(w).Encode(set)
 }
 
 func GetGearSets(w http.ResponseWriter, r *http.Request) {

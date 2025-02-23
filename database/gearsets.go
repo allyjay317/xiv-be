@@ -6,11 +6,11 @@ import (
 	"github.com/alyjay/xiv-be/types"
 )
 
-func InsertGearPiece(pieces []types.GearPieceRow, gsId string) (err error) {
+func InsertGearPiece(pieces []types.GearPieceRow, gsId string) (pieceRows []types.GearPieceRow, err error) {
 
 	db, err := GetDb()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req, err := db.NamedQuery(`
@@ -29,7 +29,7 @@ func InsertGearPiece(pieces []types.GearPieceRow, gsId string) (err error) {
 			 ) RETURNING *;
 		`, pieces)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for req.Next() {
 		var id types.GearPieceRow
@@ -46,20 +46,22 @@ func InsertGearPiece(pieces []types.GearPieceRow, gsId string) (err error) {
 			)
 		`, gsId, id.Id, id.Slot)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		pieceRows = append(pieceRows, id)
 	}
 
-	return err
+	return pieceRows, err
 }
 
-func InsertGearSetV2(g types.GearSetV2) (err error) {
+func InsertGearSetV2(g types.GearSetV2) (gs types.GearSetV2, err error) {
 
 	db, err := GetDb()
 
 	if err != nil {
-		return err
+		return g, err
 	}
+	gs = g
 
 	_, err = db.NamedExec(`
 		INSERT INTO gear_sets (
@@ -80,13 +82,17 @@ func InsertGearSetV2(g types.GearSetV2) (err error) {
 	`, g)
 
 	if err != nil {
-		return err
+		return g, err
 	}
 
 	pieces := ConvertPieceMapToRow(g.Items)
-	err = InsertGearPiece(pieces, g.ID)
+	Items, err := InsertGearPiece(pieces, g.ID)
 
-	return err
+	for _, l := range Items {
+		gs.Items[l.Slot] = l.GearPiece
+	}
+
+	return gs, err
 }
 
 func GetConfig(id string) (gs types.ItemsV2, err error) {
