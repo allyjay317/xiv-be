@@ -9,6 +9,7 @@ import (
 	"github.com/alyjay/xiv-be/database"
 	"github.com/alyjay/xiv-be/gearset"
 	"github.com/alyjay/xiv-be/user"
+	"github.com/alyjay/xiv-be/week"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
@@ -35,6 +36,8 @@ func main() {
 	character.SetUpCharacterRoutes(rCharacter)
 	rGearset := router.PathPrefix("/gearset").Subrouter()
 	gearset.SetUpGearSetRoutes(rGearset)
+	rWeek := router.PathPrefix("/week").Subrouter()
+	week.SetUpWeekRoutes(rWeek)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},

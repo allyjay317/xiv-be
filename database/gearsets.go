@@ -54,6 +54,19 @@ func InsertGearPiece(pieces []types.GearPieceRow, gsId string) (pieceRows []type
 	return pieceRows, err
 }
 
+func GetGearPiece(id int) (gp types.GearPieceRow, err error) {
+	db, err := GetDb()
+	if err != nil {
+		return gp, err
+	}
+
+	err = db.Get(&gp, `SELECT *
+			FROM gear_pieces 
+			WHERE id = $1`, id)
+
+	return gp, err
+}
+
 func InsertGearSetV2(g types.GearSetV2) (gs types.GearSetV2, err error) {
 
 	db, err := GetDb()
@@ -182,6 +195,23 @@ func SelectGearSetsForCharacterV2(id string, archived bool) (gs []types.GearSetV
 	}
 
 	return ret, err
+}
+
+func UpdateGearPiece(piece types.GearPieceRow) error {
+	db, err := GetDb()
+
+	if err != nil {
+		return err
+	}
+
+	_, err = db.NamedExec(`
+			UPDATE gear_pieces SET
+				have = :have,
+				augmented = :augmented,
+				priority = :priority
+			WHERE id = :id AND slot = :slot
+		`, piece)
+	return err
 }
 
 func UpdateGearSetV2(g types.GearSetV2) (err error) {
