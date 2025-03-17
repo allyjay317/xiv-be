@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS purchases;
+
+DROP TABLE IF EXISTS weeks;
